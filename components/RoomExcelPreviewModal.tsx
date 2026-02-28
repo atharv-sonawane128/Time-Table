@@ -22,7 +22,7 @@ interface RoomExcelPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   roomData: RoomPreview[];
-  onImport: (selectedRooms: {roomNumber: string; capacity: number; department: string; floor: number; allocatedDevices: string[]; hasSmartBoard: boolean; status: string; roomId: string; isLab: boolean;}[]) => Promise<void>;
+  onImport: (selectedRooms: {roomNumber: string; capacity: number; department: string; floor: number; allocatedDevices: string[]; hasSmartBoard: boolean; status: 'Available' | 'Occupied' | 'Under Maintenance'; roomId: string; isLab: boolean;}[]) => Promise<void>;
   isImporting: boolean;
 }
 
