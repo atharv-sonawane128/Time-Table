@@ -41,7 +41,7 @@ export default function LabMasterPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} />
-      <div className="flex-1 ml-64">
+      <div className="ml-64 w-[calc(100%-16rem)] min-w-0 overflow-x-hidden">
         <Header user={user} onLogout={handleLogout} />
         <main className="p-8">
           <div className="mb-8">

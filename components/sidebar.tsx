@@ -23,7 +23,7 @@ interface SidebarProps {
 export default function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   return (
-    <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-lg border-r border-gray-200">
+    <div className="fixed left-0 top-0 z-40 h-full w-64 bg-white shadow-lg border-r border-gray-200">
       <div className="flex items-center justify-center h-16 border-b border-gray-200">
         <h2 className="text-2xl font-bold text-black">Parul </h2>
         <h1 className="text-2xl font-bold text-red-400">University</h1>

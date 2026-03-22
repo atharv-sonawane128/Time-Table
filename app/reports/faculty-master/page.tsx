@@ -6,6 +6,8 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth, db } from '../../../lib/firebase';
 import { ArrowLeft } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
+import * as XLSX from 'xlsx';
+import { Button } from '../../../components/ui/button';
 
 import Sidebar from '../../../components/sidebar';
 import Header from '../../../components/header';
@@ -123,6 +125,37 @@ export default function FacultyMasterPage() {
     return `${semester}-${department}-${div}`;
   };
 
+  const handleExportExcel = () => {
+    if (faculty.length === 0) {
+      alert('No faculty data available to export.');
+      return;
+    }
+
+    const columns = days.flatMap(day => timeSlots.map(slot => ({ day, slot })));
+    const exportRows = faculty.map((fac) => {
+      const row: Record<string, string> = {
+        Faculty: `${fac.name} (${fac.shortName})`,
+      };
+
+      columns.forEach(({ day, slot }) => {
+        const assignment = assignments.find(
+          a => a.faculty.id === fac.id && a.day === day && a.timeSlot === slot
+        );
+
+        row[`${day} ${slot}`] = assignment
+          ? `${assignment.division} ${assignment.subject.subjectShortName || assignment.subject.subjectCode} (${assignment.faculty.shortName}) ${assignment.room.roomNumber}`
+          : 'Free';
+      });
+
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Faculty Master');
+    XLSX.writeFile(workbook, `faculty-master-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
 
 
   if (!user) {
@@ -132,10 +165,11 @@ export default function FacultyMasterPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} />
-      <div className="flex-1 ml-64">
+      <div className="ml-64 w-[calc(100%-16rem)] min-w-0 overflow-x-hidden">
         <Header user={user} onLogout={handleLogout} />
         <main className="p-8">
-          <div className="mb-8">
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
             <button
               onClick={handleBack}
               className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
@@ -145,14 +179,18 @@ export default function FacultyMasterPage() {
             </button>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Faculty Master</h2>
             <p className="text-gray-600">View faculty assignments across all timetables</p>
+            </div>
+            <Button onClick={handleExportExcel} disabled={faculty.length === 0}>
+              Export Excel
+            </Button>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto overflow-y-auto max-h-[40rem]">
-              <table className="w-full border-collapse">
-                <thead className="bg-gray-50 sticky top-0">
+            <div className="relative isolate overflow-x-auto overflow-y-auto max-h-[40rem]">
+              <table className="w-full border-collapse min-w-max">
+                <thead className="bg-gray-50 sticky top-0 z-20">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[200px] sticky left-0 bg-gray-50">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[200px] sticky left-0 bg-gray-50 z-30 shadow-[2px_0_0_0_rgba(229,231,235,1)]">
                       Faculty
                     </th>
                     {days.flatMap(day =>
@@ -171,7 +209,7 @@ export default function FacultyMasterPage() {
                 <tbody className="bg-white">
                   {faculty.map((fac) => (
                     <tr key={fac.id} className="border-b border-gray-200 last:border-b-0">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 bg-gray-50 border-r border-gray-200 min-w-[200px] sticky left-0">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 bg-gray-50 border-r border-gray-200 min-w-[200px] sticky left-0 z-10 shadow-[2px_0_0_0_rgba(229,231,235,1)]">
                         {fac.name} ({fac.shortName})
                       </td>
                       {days.flatMap(day =>
@@ -183,13 +221,13 @@ export default function FacultyMasterPage() {
                         return (
                           <td
                             key={`${day}-${slot}`}
-                            className={`px-4 py-3 text-center text-sm text-gray-900 border-r border-gray-200 last:border-r-0 min-w-[120px] cursor-pointer transition-colors ${
+                            className={`px-4 py-3 text-center text-sm text-gray-900 border-r border-gray-200 last:border-r-0 min-w-[120px] max-w-[160px] align-top cursor-pointer transition-colors ${
                               assignment ? 'bg-blue-50' : 'bg-green-50 italic text-gray-600'
                             }`}
                             onClick={() => handleCellClick(fac.id, slot, day)}
                           >
                             {assignment ? (
-                              <div className="text-xs">
+                              <div className="text-xs whitespace-normal break-words leading-tight">
                                 {assignment.division} {assignment.faculty.shortName}({assignment.subject.subjectShortName || assignment.subject.subjectCode}) {assignment.room.roomNumber}
                               </div>
                             ) : (

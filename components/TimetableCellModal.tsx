@@ -12,6 +12,7 @@ interface Subject {
   isLaboratory: boolean;
   subjectId: string;
   assignedFaculties: string[];
+  semester?: number;
 }
 
 interface Faculty {
@@ -90,6 +91,12 @@ const TimetableCellModal: React.FC<TimetableCellModalProps> = ({
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [allAssignments, setAllAssignments] = useState<Assignment[]>([]);
 
+  const currentSemester = Number(semesterId);
+  const hasValidSemester = Number.isFinite(currentSemester);
+  const subjectsForSemester = subjects.filter(
+    (subject) => subject.semester !== undefined && subject.semester === currentSemester
+  );
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -117,7 +124,8 @@ const TimetableCellModal: React.FC<TimetableCellModalProps> = ({
           subjectShortName: String(data.subjectShortName || ''),
           isLaboratory: Boolean(data.isLaboratory || false),
           subjectId: data.subjectId || doc.id,
-          assignedFaculties: Array.isArray(data.assignedFaculties) ? data.assignedFaculties : []
+          assignedFaculties: Array.isArray(data.assignedFaculties) ? data.assignedFaculties : [],
+          semester: data.semester ? Number(data.semester) : undefined,
         } as Subject);
       });
       setSubjects(subjectList);
@@ -249,7 +257,7 @@ const TimetableCellModal: React.FC<TimetableCellModalProps> = ({
             <div>
               <h4 className="text-md font-semibold text-gray-900 mb-4">Select Subject</h4>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {subjects.map((subject) => (
+                {subjectsForSemester.map((subject) => (
                   <Card
                     key={subject.id}
                     className={`p-3 cursor-pointer transition-colors ${
@@ -277,8 +285,12 @@ const TimetableCellModal: React.FC<TimetableCellModalProps> = ({
                     </div>
                   </Card>
                 ))}
-                {subjects.length === 0 && (
-                  <p className="text-gray-500 text-center py-4">No subjects available</p>
+                {subjectsForSemester.length === 0 && (
+                  <p className="text-gray-500 text-center py-4">
+                    {hasValidSemester
+                      ? `No subjects available for Semester ${currentSemester}`
+                      : 'No subjects available'}
+                  </p>
                 )}
               </div>
             </div>

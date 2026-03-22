@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Card } from '@/components/ui/card';
 import { departments } from '@/lib/data';
@@ -48,69 +48,55 @@ interface FreeFacultyInfo {
   status: 'Active' | 'Inactive';
 }
 
+const TIME_SLOTS = [
+  { time: '07:30 – 08:25', key: '0', start: 450, end: 505 },
+  { time: '08:25 – 09:20', key: '1', start: 505, end: 560 },
+  { time: '09:20 – 09:30', key: 'break', start: 560, end: 570 },
+  { time: '09:30 – 10:25', key: '2', start: 570, end: 625 },
+  { time: '10:25 – 11:20', key: '3', start: 625, end: 680 },
+  { time: '11:20 – 12:20', key: 'break', start: 680, end: 740 },
+  { time: '12:20 – 01:15', key: '4', start: 740, end: 795 },
+  { time: '01:15 – 02:10', key: '5', start: 795, end: 850 },
+  { time: '02:10 – 02:30', key: 'break', start: 850, end: 870 },
+  { time: '02:30 – 03:25', key: '6', start: 870, end: 925 },
+  { time: '03:25 – 04:20', key: '7', start: 925, end: 980 },
+] as const;
+
+function normalizeSlotString(slot: string): string {
+  return String(slot || '')
+    .replace(/\s+/g, '')
+    .replace(/-/g, '–')
+    .replace(/(^|[–])0(?=\d:)/g, '$1');
+}
+
 export default function BusyFacultyGrid() {
   const [busyFaculty, setBusyFaculty] = useState<BusyFacultyInfo[]>([]);
   const [freeFaculty, setFreeFaculty] = useState<FreeFacultyInfo[]>([]);
   const [allFaculty, setAllFaculty] = useState<Faculty[]>([]);
   const [currentTime, setCurrentTime] = useState<string>('');
-
-  // Define time slots
-  const timeSlots = [
-    { time: '07:30 – 08:25', key: '0' },
-    { time: '08:25 – 09:20', key: '1' },
-    { time: '09:20 – 09:30', key: 'break' },
-    { time: '09:30 – 10:25', key: '2' },
-    { time: '10:25 – 11:20', key: '3' },
-    { time: '11:20 – 12:20', key: 'break' },
-    { time: '12:20 – 01:15', key: '4' },
-    { time: '01:15 – 02:10', key: '5' },
-    { time: '02:10 – 02:30', key: 'break' },
-    { time: '02:30 – 03:25', key: '6' },
-    { time: '03:25 – 04:20', key: '7' },
-  ];
+  const [activeDay, setActiveDay] = useState<string>(() => getDayName());
+  const [activeSlot, setActiveSlot] = useState<string>(() => getCurrentTimeSlot()?.time || '');
 
   // Get day name
-  const getDayName = (): string => {
+  function getDayName(): string {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     return days[new Date().getDay()];
-  };
+  }
 
   // Get current time slot
-  const getCurrentTimeSlot = (): { time: string; key: string } | null => {
+  function getCurrentTimeSlot(): { time: string; key: string } | null {
     const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const currentMinutes = hours * 60 + minutes;
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    for (const slot of timeSlots) {
+    for (const slot of TIME_SLOTS) {
       if (slot.key === 'break') continue; // Skip break slots
-      
-      const [startStr, endStr] = slot.time.split(' – ');
-      let [startHour, startMin] = startStr.split(':').map(Number);
-      let [endHour, endMin] = endStr.split(':').map(Number);
 
-      // Handle PM times (times after 12:00 that appear as 01:xx, 02:xx, etc.)
-      // If start hour is 12 or greater, it's already in correct format
-      // If end hour is less than start hour, it's a PM time, so add 12
-      if (startHour >= 12) {
-        // Start is PM, check if end needs adjustment
-        if (endHour < 12 && endHour < startHour) {
-          endHour += 12;
-        }
-      } else if (startHour < 12 && endHour < startHour) {
-        // This means we've crossed noon
-        endHour += 12;
-      }
-
-      const startTime = startHour * 60 + startMin;
-      const endTime = endHour * 60 + endMin;
-
-      if (currentMinutes >= startTime && currentMinutes < endTime) {
+      if (currentMinutes >= slot.start && currentMinutes < slot.end) {
         return slot;
       }
     }
     return null;
-  };
+  }
 
   // Fetch all faculty
   useEffect(() => {
@@ -141,57 +127,74 @@ export default function BusyFacultyGrid() {
     return () => unsubscribe();
   }, []);
 
+  // Keep active day/slot aligned with real time.
+  useEffect(() => {
+    const syncCurrentSlot = () => {
+      setActiveDay(getDayName());
+      setActiveSlot(getCurrentTimeSlot()?.time || '');
+    };
+
+    syncCurrentSlot();
+    const interval = setInterval(syncCurrentSlot, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Fetch timetables and find busy faculty
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'timetables'), (snapshot) => {
       const busyFacultyMap = new Map<string, BusyFacultyInfo>();
-      const currentDay = getDayName();
-      const currentTimeSlot = getCurrentTimeSlot();
+      setCurrentTime(activeSlot);
 
-      console.log('Current Day:', currentDay);
-      console.log('Current Time Slot:', currentTimeSlot);
-
-      if (!currentTimeSlot) {
-        console.log('No current time slot found');
+      if (!activeSlot) {
         setBusyFaculty([]);
-        setCurrentTime('');
+
+        const freeFacultyOutsideSlot: FreeFacultyInfo[] = allFaculty
+          .filter(f => f.status === 'Active')
+          .map(f => ({
+            id: f.id,
+            name: f.name,
+            shortName: f.shortName,
+            status: f.status,
+          }));
+
+        setFreeFaculty(freeFacultyOutsideSlot);
         return;
       }
-
-      setCurrentTime(currentTimeSlot.time);
 
       snapshot.docs.forEach((timetableDoc) => {
         const data = timetableDoc.data();
         const assignments: Assignment[] = data.assignments || [];
-        
-        // Use stored fields from timetable data
-        const semesterId = data.semesterId || '';
-        const departmentId = data.departmentId || '';
-        const division = data.division || '';
-        
-        const dept = departments.find(d => d.id === departmentId);
-        const deptLetter = dept?.letter || departmentId?.charAt(0)?.toUpperCase() || '';
-        const divisionString = `${semesterId}${deptLetter}${division}`;
 
-        // Find assignments for current day and time slot
+        const [semesterId, departmentId, divisionNum] = String(timetableDoc.id).split('_');
+        const dept = departments.find(d => d.id === departmentId);
+        const deptLetter = dept?.letter || String(departmentId || '').charAt(0).toUpperCase();
+        const divisionString = `${semesterId || ''}${deptLetter || ''}${divisionNum || data.division || ''}`;
+
+        // Find assignments for selected day and time slot
         assignments.forEach((assignment) => {
+          const assignmentSlot = normalizeSlotString(assignment.timeSlot);
+          const activeSlotKey = normalizeSlotString(activeSlot);
+
           if (
-            assignment.day === currentDay &&
-            assignment.timeSlot === currentTimeSlot.time &&
+            assignment.day === activeDay &&
+            assignmentSlot === activeSlotKey &&
             assignment.faculty
           ) {
-            const facultyId = assignment.faculty.id || assignment.faculty;
+            const rawFacultyId = String(assignment.faculty.id || assignment.faculty.facultyId || assignment.faculty || '');
             const facultyShortName = assignment.faculty.shortName || '';
             const facultyName = assignment.faculty.name || '';
             
-            // Try to get faculty info from the assignment first, then from allFaculty
-            const facultyFromList = allFaculty.find(f => f.id === facultyId);
+            // Normalize faculty identity between id and facultyId.
+            const facultyFromList = allFaculty.find(
+              f => f.id === rawFacultyId || f.facultyId === rawFacultyId
+            );
+            const normalizedId = facultyFromList?.id || rawFacultyId;
             
-            busyFacultyMap.set(facultyId, {
-              facultyId: facultyId,
+            busyFacultyMap.set(normalizedId, {
+              facultyId: normalizedId,
               name: facultyName || facultyFromList?.name || '',
               shortName: facultyShortName || facultyFromList?.shortName || '',
-              duration: currentTimeSlot.time,
+              duration: activeSlot,
               room: assignment.room?.roomNumber || assignment.room || 'N/A',
               division: divisionString
             });
@@ -203,9 +206,17 @@ export default function BusyFacultyGrid() {
       setBusyFaculty(Array.from(busyFacultyMap.values()));
 
       // Calculate free faculty
-      const busyFacultyIds = new Set(busyFacultyMap.keys());
+      const busyFacultyIds = new Set<string>();
+      busyFacultyMap.forEach((_, id) => {
+        busyFacultyIds.add(id);
+        const fac = allFaculty.find(f => f.id === id);
+        if (fac?.facultyId) {
+          busyFacultyIds.add(fac.facultyId);
+        }
+      });
+
       const freeFacultyList: FreeFacultyInfo[] = allFaculty
-        .filter(f => !busyFacultyIds.has(f.id) && f.status === 'Active')
+        .filter(f => !busyFacultyIds.has(f.id) && !busyFacultyIds.has(f.facultyId) && f.status === 'Active')
         .map(f => ({
           id: f.id,
           name: f.name,
@@ -218,7 +229,7 @@ export default function BusyFacultyGrid() {
     });
 
     return () => unsubscribe();
-  }, [allFaculty]);
+  }, [allFaculty, activeDay, activeSlot]);
 
   return (
     <div className="space-y-8">
@@ -226,10 +237,12 @@ export default function BusyFacultyGrid() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">
-            Busy Faculty {currentTime && `(${currentTime})`}
+            Busy Faculty {currentTime ? `(${activeDay} | ${currentTime})` : '(No active lecture slot)'}
           </h3>
           {busyFaculty.length === 0 && (
-            <p className="text-sm text-gray-500 mt-1">No faculty teaching at this time</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {currentTime ? 'No faculty teaching at this time' : 'Currently break/non-teaching period'}
+            </p>
           )}
         </div>
 

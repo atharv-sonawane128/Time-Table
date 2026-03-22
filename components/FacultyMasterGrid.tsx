@@ -137,16 +137,16 @@ const FacultyMasterGrid: React.FC = () => {
       <div className="px-6 py-4 border-b border-gray-200 text-center">
         <h3 className="text-lg font-semibold text-gray-900">Faculty Master Timetable</h3>
       </div>
-      <div className="overflow-auto max-h-[70vh]">
+      <div className="relative isolate overflow-auto max-h-[70vh]">
         {faculty.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-gray-500">No faculty found. Add faculty in the Faculty section.</p>
           </div>
         ) : (
           <table className="w-full border-collapse min-w-max">
-            <thead className="bg-gray-50 sticky top-0 z-10">
+            <thead className="bg-gray-50 sticky top-0 z-20">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[250px] sticky left-0 bg-green-50 z-20">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[250px] sticky left-0 bg-green-50 z-30 shadow-[2px_0_0_0_rgba(229,231,235,1)]">
                   Faculty
                 </th>
                 {days.map(day => (
@@ -165,7 +165,7 @@ const FacultyMasterGrid: React.FC = () => {
             <tbody className="bg-white">
               {faculty.map((fac) => (
                 <tr key={fac.id} className="border-b border-gray-200 last:border-b-0">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 bg-green-50 border-r border-gray-200 min-w-[250px] sticky left-0 z-10">
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900 bg-green-50 border-r border-gray-200 min-w-[250px] sticky left-0 z-10 shadow-[2px_0_0_0_rgba(229,231,235,1)]">
                     {getFacultyDisplayName(fac)}
                   </td>
                   {days.map(day => (
@@ -176,10 +176,10 @@ const FacultyMasterGrid: React.FC = () => {
                       return (
                         <td
                           key={`${fac.id}-${day}-${slot}`}
-                          className={`px-2 py-2 text-center text-xs border-r border-gray-200 last:border-r-0 min-w-[140px] ${cellStyle}`}
+                          className={`px-2 py-2 text-center text-xs border-r border-gray-200 last:border-r-0 min-w-[140px] max-w-[180px] align-top ${cellStyle}`}
                         >
                           {assignment ? (
-                            <div className="leading-tight">
+                            <div className="leading-tight whitespace-normal break-words">
                               <div className="font-medium">{formatDivision(assignment.division)} : {assignment.subject.subjectShortName || assignment.subject.subjectCode}</div>
                               <div className="text-gray-600">{assignment.room.roomNumber}</div>
                               {/* Optional strength can be added here if available */}

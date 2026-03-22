@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Button } from '@/components/ui/button';
+import * as XLSX from 'xlsx';
+import { departments } from '@/lib/data';
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -78,8 +81,20 @@ const LabMasterGrid: React.FC = () => {
       const allAssignments: Assignment[] = [];
       timetableQuerySnapshot.forEach((doc) => {
         const data = doc.data();
+        const timetableId = doc.id; // Format: semesterId_departmentId_division
+        const [semesterId, departmentId, divisionNum] = timetableId.split('_');
+        const department = departments.find((d) => d.id === departmentId);
+        const departmentLetter = department?.letter || '';
+        const fullDivision = semesterId && divisionNum
+          ? `${semesterId}${departmentLetter}${divisionNum}`
+          : String(data.division || '');
+
         if (data.assignments && Array.isArray(data.assignments)) {
-          allAssignments.push(...data.assignments);
+          const assignmentsWithDivision = data.assignments.map((assignment: any) => ({
+            ...assignment,
+            division: fullDivision,
+          }));
+          allAssignments.push(...assignmentsWithDivision);
         }
       });
       setAssignments(allAssignments);
@@ -116,11 +131,35 @@ const LabMasterGrid: React.FC = () => {
   };
 
   const formatDivision = (division: string) => {
-    if (!division || division.length < 3) return division;
-    const semester = division[0];
-    const department = division[1];
-    const div = division[2];
-    return `${semester}-${department}-${div}`;
+    return division || '';
+  };
+
+  const handleExportExcel = () => {
+    if (labs.length === 0) {
+      alert('No lab data available to export.');
+      return;
+    }
+
+    const columns = days.flatMap(day => doubleSlots.map(slot => ({ day, slot })));
+    const exportRows = labs.map((lab) => {
+      const row: Record<string, string> = {
+        Lab: lab.roomNumber,
+      };
+
+      columns.forEach(({ day, slot }) => {
+        const assignment = getAssignmentForCell(lab.roomNumber, day, slot);
+        row[`${day} ${slot}`] = assignment
+          ? `${assignment.subject.subjectShortName || assignment.subject.subjectCode} (${assignment.faculty.shortName}) ${formatDivision(assignment.division)}`
+          : 'Free';
+      });
+
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Lab Master');
+    XLSX.writeFile(workbook, `lab-master-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   if (loading) {
@@ -139,20 +178,25 @@ const LabMasterGrid: React.FC = () => {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">Lab Master Grid</h3>
-        <p className="text-sm text-gray-600">Lab availability and session assignments</p>
+      <div className="px-6 py-4 border-b border-gray-200 flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Lab Master Grid</h3>
+          <p className="text-sm text-gray-600">Lab availability and session assignments</p>
+        </div>
+        <Button onClick={handleExportExcel} disabled={labs.length === 0}>
+          Export Excel
+        </Button>
       </div>
-      <div className="overflow-auto max-h-[60vh]">
+      <div className="relative isolate overflow-auto max-h-[60vh]">
         {labs.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-gray-500">No labs found. Add labs in the Rooms section.</p>
           </div>
         ) : (
           <table className="w-full border-collapse min-w-max">
-            <thead className="bg-gray-50 sticky top-0 z-10">
+            <thead className="bg-gray-50 sticky top-0 z-20">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[120px] sticky left-0 bg-gray-50 z-20">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[120px] sticky left-0 bg-gray-50 z-30 shadow-[2px_0_0_0_rgba(229,231,235,1)]">
                   Lab
                 </th>
                 {days.map(day => (
@@ -171,7 +215,7 @@ const LabMasterGrid: React.FC = () => {
             <tbody className="bg-white">
               {labs.map((lab: Lab) => (
                 <tr key={lab.id} className="border-b border-gray-200 last:border-b-0">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 bg-gray-50 border-r border-gray-200 min-w-[120px] sticky left-0 z-10">
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900 bg-gray-50 border-r border-gray-200 min-w-[120px] sticky left-0 z-10 shadow-[2px_0_0_0_rgba(229,231,235,1)]">
                     {lab.roomNumber}
                   </td>
                   {days.map(day => (
@@ -180,14 +224,16 @@ const LabMasterGrid: React.FC = () => {
                       return (
                         <td
                           key={`${lab.roomNumber}-${day}-${slot}`}
-                          className={`px-4 py-3 text-center text-sm text-gray-900 border-r border-gray-200 last:border-r-0 min-w-[120px] cursor-pointer transition-colors ${
+                          className={`px-4 py-3 text-center text-sm text-gray-900 border-r border-gray-200 last:border-r-0 min-w-[120px] max-w-[160px] align-top cursor-pointer transition-colors ${
                             assignment ? 'bg-blue-50' : 'bg-green-50 italic text-gray-600'
                           }`}
                         >
                           {assignment ? (
-                            <div className="text-xs">
-                              {assignment.subject.subjectShortName || assignment.subject.subjectCode}
-                              ({assignment.faculty.shortName}) {formatDivision(assignment.division)}
+                            <div className="leading-tight whitespace-normal break-words">
+                              <div className="font-medium text-xs">
+                                {formatDivision(assignment.division)} : {assignment.subject.subjectShortName || assignment.subject.subjectCode}
+                              </div>
+                              <div className="text-gray-600 text-xs">({assignment.faculty.shortName})</div>
                             </div>
                           ) : (
                             'Free'

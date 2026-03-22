@@ -6,6 +6,9 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth, db } from '../../../lib/firebase';
 import { ArrowLeft } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
+import * as XLSX from 'xlsx';
+import { Button } from '../../../components/ui/button';
+import { departments } from '../../../lib/data';
 
 import Sidebar from '../../../components/sidebar';
 import Header from '../../../components/header';
@@ -79,10 +82,18 @@ export default function LectureMasterPage() {
       const allAssignments: Assignment[] = [];
       snapshot.docs.forEach(doc => {
         const data = doc.data();
+        const timetableId = doc.id; // Format: semesterId_departmentId_division
+        const [semesterId, departmentId, divisionNum] = timetableId.split('_');
+        const department = departments.find((d) => d.id === departmentId);
+        const departmentLetter = department?.letter || '';
+        const fullDivision = semesterId && divisionNum
+          ? `${semesterId}${departmentLetter}${divisionNum}`
+          : String(data.division || '');
+
         if (data.assignments) {
           const assignmentsWithDivision = data.assignments.map((assignment: any) => ({
             ...assignment,
-            division: data.division || '',
+            division: fullDivision,
           }));
           allAssignments.push(...assignmentsWithDivision);
         }
@@ -111,11 +122,44 @@ export default function LectureMasterPage() {
   };
 
   const formatDivision = (division: string) => {
-    if (!division || division.length < 3) return division;
-    const semester = division[0];
-    const department = division[1];
-    const div = division[2];
-    return `${semester}-${department}-${div}`;
+    return division || '';
+  };
+
+  const handleExportExcel = () => {
+    if (rooms.length === 0) {
+      alert('No room data available to export.');
+      return;
+    }
+
+    const sortedRooms = [...rooms].sort((a, b) => {
+      const numA = parseInt(a.roomNumber.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.roomNumber.replace(/\D/g, '')) || 0;
+      return numA - numB;
+    });
+
+    const columns = days.flatMap(day => timeSlots.map(slot => ({ day, slot })));
+    const exportRows = sortedRooms.map((room) => {
+      const row: Record<string, string> = {
+        Room: `${room.roomNumber} (${room.department})`,
+      };
+
+      columns.forEach(({ day, slot }) => {
+        const assignment = assignments.find(
+          a => a.room.roomNumber === room.roomNumber && a.day === day && a.timeSlot === slot
+        );
+
+        row[`${day} ${slot}`] = assignment
+          ? `${assignment.subject.subjectShortName || assignment.subject.subjectCode} (${assignment.faculty.shortName}) ${formatDivision(assignment.division)}`
+          : 'Free';
+      });
+
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Lecture Master');
+    XLSX.writeFile(workbook, `lecture-master-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   if (!user) {
@@ -125,10 +169,11 @@ export default function LectureMasterPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} />
-      <div className="flex-1 ml-64">
+      <div className="ml-64 w-[calc(100%-16rem)] min-w-0 overflow-x-hidden">
         <Header user={user} onLogout={handleLogout} />
         <main className="p-8">
-          <div className="mb-8">
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
             <button
               onClick={handleBack}
               className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
@@ -138,14 +183,18 @@ export default function LectureMasterPage() {
             </button>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Lecture Master</h2>
             <p className="text-gray-600">Manage lecture information and details</p>
+            </div>
+            <Button onClick={handleExportExcel} disabled={rooms.length === 0}>
+              Export Excel
+            </Button>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-hidden overflow-y-auto max-h-[40rem]">
-              <table className="w-full border-collapse">
-                <thead className="bg-gray-50 sticky top-0">
+            <div className="relative isolate overflow-x-auto overflow-y-auto max-h-[40rem]">
+              <table className="w-full border-collapse min-w-max">
+                <thead className="bg-gray-50 sticky top-0 z-20">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[200px] sticky left-0 bg-gray-50">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[200px] sticky left-0 bg-gray-50 z-30 shadow-[2px_0_0_0_rgba(229,231,235,1)]">
                       Room
                     </th>
                     {days.flatMap(day =>
@@ -170,7 +219,7 @@ export default function LectureMasterPage() {
                     })
                     .map((room) => (
                     <tr key={room.id} className="border-b border-gray-200 last:border-b-0">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 bg-gray-50 border-r border-gray-200 min-w-[200px] sticky left-0">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 bg-gray-50 border-r border-gray-200 min-w-[200px] sticky left-0 z-10 shadow-[2px_0_0_0_rgba(229,231,235,1)]">
                         {room.roomNumber} ({room.department})
                       </td>
                       {days.flatMap(day =>
@@ -182,15 +231,17 @@ export default function LectureMasterPage() {
                         return (
                           <td
                             key={`${day}-${slot}`}
-                            className={`px-4 py-3 text-center text-sm text-gray-900 border-r border-gray-200 last:border-r-0 min-w-[120px] cursor-pointer transition-colors ${
+                            className={`px-4 py-3 text-center text-sm text-gray-900 border-r border-gray-200 last:border-r-0 min-w-[120px] max-w-[160px] align-top cursor-pointer transition-colors ${
                               assignment ? 'bg-blue-50' : 'bg-green-50 italic text-gray-600'
                             }`}
                             onClick={() => handleCellClick(room.id, slot, day)}
                           >
                             {assignment ? (
-                              <div className="text-xs">
-                                {assignment.subject.subjectShortName || assignment.subject.subjectCode}
-                                ({assignment.faculty.shortName}) {formatDivision(assignment.division)}
+                              <div className="leading-tight whitespace-normal break-words">
+                                <div className="font-medium text-xs">
+                                  {formatDivision(assignment.division)} : {assignment.subject.subjectShortName || assignment.subject.subjectCode}
+                                </div>
+                                <div className="text-gray-600 text-xs">({assignment.faculty.shortName})</div>
                               </div>
                             ) : (
                               'Free'
