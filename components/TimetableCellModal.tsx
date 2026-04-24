@@ -95,7 +95,12 @@ const TimetableCellModal: React.FC<TimetableCellModalProps> = ({
   const hasValidSemester = Number.isFinite(currentSemester);
   const subjectsForSemester = subjects.filter(
     (subject) => subject.semester !== undefined && subject.semester === currentSemester
-  );
+  ).sort((a, b) => {
+    if (a.isLaboratory === b.isLaboratory) {
+      return a.subjectName.localeCompare(b.subjectName, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    return a.isLaboratory ? 1 : -1;
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -227,7 +232,7 @@ const TimetableCellModal: React.FC<TimetableCellModalProps> = ({
       assignment.day === day
     );
     return { ...room, runtimeStatus: isAvailable ? room.status : 'Occupied' as 'Available' | 'Occupied' | 'Under Maintenance' };
-  });
+  }).sort((a, b) => a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true, sensitivity: 'base' }));
 
   const handleConfirm = () => {
     onSelect(selectedSubject, selectedFaculty, selectedRoom);
@@ -302,7 +307,9 @@ const TimetableCellModal: React.FC<TimetableCellModalProps> = ({
               </h4>
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {selectedSubject ? (
-                  subjectFaculties.map((faculty) => (
+                  subjectFaculties.map((faculty) => {
+                    const workload = allAssignments.filter(a => a.faculty && a.faculty.facultyId === faculty.facultyId).length;
+                    return (
                     <Card
                       key={faculty.id}
                       className={`p-3 cursor-pointer transition-colors ${
@@ -319,6 +326,7 @@ const TimetableCellModal: React.FC<TimetableCellModalProps> = ({
                           <h5 className="font-medium text-gray-900">{faculty.name}</h5>
                           <p className="text-sm text-gray-600">{faculty.shortName} - {faculty.designation}</p>
                           <p className="text-sm text-gray-600">{faculty.department}</p>
+                          <p className="text-blue-600 font-medium text-xs mt-1">Workload: {workload}/{faculty.maxLecturesPerWeek} hrs/week</p>
                         </div>
                         <span className={`px-2 py-1 text-xs rounded-full ${
                           faculty.runtimeStatus === 'Active'
@@ -331,7 +339,8 @@ const TimetableCellModal: React.FC<TimetableCellModalProps> = ({
                         </span>
                       </div>
                     </Card>
-                  ))
+                    );
+                  })
                 ) : (
                   <p className="text-gray-500 text-center py-4">Select a subject first</p>
                 )}

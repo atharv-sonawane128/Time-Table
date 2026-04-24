@@ -151,7 +151,6 @@ export default function ExcelPreviewModal({
                     </div>
 
                     <div className="space-y-2 text-sm text-gray-600">
-                      <p><strong>Faculty ID:</strong> {faculty.faculty.facultyId}</p>
                       {faculty.faculty.phone && <p><strong>Phone:</strong> {faculty.faculty.phone}</p>}
                       <p><strong>Subjects:</strong> {faculty.faculty.subjects.join(', ') || 'None'}</p>
                       <p><strong>Available Days:</strong> {faculty.faculty.availableDays.join(', ') || 'None'}</p>

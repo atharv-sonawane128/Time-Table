@@ -332,6 +332,17 @@ export default function RoomsPage() {
             <div className="flex space-x-3">
               <Button
                 variant="outline"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = '/room_format.xlsx';
+                  link.download = 'room_format.xlsx';
+                  link.click();
+                }}
+              >
+                Download Format
+              </Button>
+              <Button
+                variant="outline"
                 onClick={handleImportClick}
                 disabled={isImporting}
               >

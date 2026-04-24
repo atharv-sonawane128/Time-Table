@@ -22,6 +22,8 @@ interface Subject {
   subjectId: string;
   assignedFaculties: string[];
   semester?: number;
+  academicYear?: string;
+  branch?: string;
 }
 
 export default function SubjectsPage() {
@@ -32,9 +34,14 @@ export default function SubjectsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
-  const [previewSubjectData, setPreviewSubjectData] = useState<{subject: Omit<Subject, 'id'>, isDuplicate: boolean}[]>([]);
+  const [previewSubjectData, setPreviewSubjectData] = useState<{ subject: Omit<Subject, 'id'>, isDuplicate: boolean }[]>([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState('2026-27');
+  const [semesterType, setSemesterType] = useState<'all' | 'odd' | 'even'>('all');
+  const [selectedBranch, setSelectedBranch] = useState('All');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  const academicYears = ['2025-26', '2026-27', '2027-28', '2028-29'];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -61,7 +68,9 @@ export default function SubjectsPage() {
             isLaboratory: Boolean(data.isLaboratory || false),
             subjectId: data.subjectId || doc.id,
             assignedFaculties: Array.isArray(data.assignedFaculties) ? data.assignedFaculties : [],
-            semester: data.semester ? Number(data.semester) : undefined
+            semester: data.semester ? Number(data.semester) : undefined,
+            academicYear: data.academicYear || undefined,
+            branch: data.branch || undefined,
           } as Subject);
         });
         setSubjects(subjectList);
@@ -108,18 +117,29 @@ export default function SubjectsPage() {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      // Normalize row keys to handle potential whitespace and case differences in headers
+      const normalizedJsonData = jsonData.map(row => {
+        const newRow: any = {};
+        for (const key in row) {
+          newRow[key.trim().toUpperCase()] = row[key];
+        }
+        return newRow;
+      });
 
       // Parse and validate subject data
-      const subjectData: Omit<Subject, 'id'>[] = jsonData
+      const subjectData: Omit<Subject, 'id'>[] = normalizedJsonData
         .map((row: any) => ({
-          subjectName: String(row.SUBJECT_NAME || row.subjectName || '').trim(),
-          subjectCode: String(row.SUBJECT_CODE || row.subjectCode || '').trim(),
-          subjectShortName: String(row.SUBJECT_SHORT_NAME || row.subjectShortName || '').trim(),
-          isLaboratory: row.Laboratory === 'Yes' || row.laboratory === true || row.isLaboratory === true,
-          subjectId: row['Subject ID'] || row.subjectId || `SUB${Date.now() + Math.random()}`,
+          subjectName: String(row.SUBJECT_NAME || row.SUBJECTNAME || '').trim(),
+          subjectCode: String(row.SUBJECT_CODE || row.SUBJECTCODE || '').trim(),
+          subjectShortName: String(row.SUBJECT_SHORT_NAME || row.SUBJECTSHORTNAME || '').trim(),
+          isLaboratory: String(row.LABORATORY || '').toLowerCase() === 'yes' || row.LABORATORY === true,
+          subjectId: String(row['SUBJECT ID'] || row.SUBJECTID || `SUB${Date.now() + Math.random()}`),
           assignedFaculties: [],
-          semester: row.Semester ? Number(row.Semester) : undefined
+          semester: row.SEMESTER ? Number(row.SEMESTER) : undefined,
+          academicYear: row.ACY ? String(row.ACY).trim() : selectedAcademicYear,
+          branch: row.BRANCH ? String(row.BRANCH).trim() : undefined,
         }))
         .filter(subject => subject.subjectCode && subject.subjectName); // Filter out invalid rows
 
@@ -130,23 +150,23 @@ export default function SubjectsPage() {
 
       // Get existing subject codes from database (case-insensitive)
       const existingSubjectCodes = subjects.map(s => String(s.subjectCode).trim().toLowerCase());
-      
+
       // Track seen codes within Excel file (case-insensitive)
       const seenCodesInExcel = new Set<string>();
-      
+
       // Mark duplicates (both from database and within Excel file)
       const previewData = subjectData.map(subject => {
         const subjectCodeLower = subject.subjectCode.toLowerCase();
-        
+
         // Check if duplicate exists in database
         const isDuplicateInDB = existingSubjectCodes.includes(subjectCodeLower);
-        
+
         // Check if duplicate exists within Excel file
         const isDuplicateInExcel = seenCodesInExcel.has(subjectCodeLower);
-        
+
         // Add to seen codes
         seenCodesInExcel.add(subjectCodeLower);
-        
+
         return {
           subject,
           isDuplicate: isDuplicateInDB || isDuplicateInExcel
@@ -173,7 +193,11 @@ export default function SubjectsPage() {
   const handlePreviewImport = async (selectedSubjects: Omit<Subject, 'id'>[]) => {
     setIsImporting(true);
     try {
-      const promises = selectedSubjects.map(data => addDoc(collection(db, 'subjects'), data));
+      const promises = selectedSubjects.map(data => addDoc(collection(db, 'subjects'), {
+        ...data,
+        academicYear: data.academicYear || selectedAcademicYear,
+        branch: data.branch || undefined,
+      }));
       await Promise.all(promises);
       alert(`Successfully imported ${selectedSubjects.length} subjects!`);
     } catch (error) {
@@ -188,13 +212,33 @@ export default function SubjectsPage() {
     return <div>Loading...</div>;
   }
 
+  // Filter subjects by selected academic year
+  const yearFilteredSubjects = subjects.filter(
+    s => !s.academicYear || s.academicYear === selectedAcademicYear
+  );
+
+  // Filter by branch
+  const branchFilteredSubjects = yearFilteredSubjects.filter(
+    s => selectedBranch === 'All' || s.branch === selectedBranch
+  );
+
+  // Filter by even/odd semester parity
+  const filteredSubjects = branchFilteredSubjects.filter(s => {
+    if (semesterType === 'all') return true;
+    if (!s.semester) return false;
+    return semesterType === 'even' ? s.semester % 2 === 0 : s.semester % 2 !== 0;
+  });
+
   // Get unique semesters and sort them
-  const uniqueSemesters = Array.from(new Set(subjects.map(s => s.semester).filter(Boolean))) as number[];
+  const uniqueSemesters = Array.from(new Set(filteredSubjects.map(s => s.semester).filter(Boolean))) as number[];
   uniqueSemesters.sort((a, b) => a - b);
+
+  // Get unique branches for the dropdown
+  const uniqueBranches = Array.from(new Set(subjects.map(s => s.branch).filter(Boolean))) as string[];
 
   // Function to get filtered subjects for a semester
   const getSubjectsBySemester = (semesterId: number) => {
-    return subjects.filter(
+    return filteredSubjects.filter(
       s =>
         s.semester === semesterId &&
         (s.subjectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -204,7 +248,7 @@ export default function SubjectsPage() {
   };
 
   const getSubjectsWithoutSemester = () => {
-    return subjects.filter(
+    return filteredSubjects.filter(
       s =>
         !s.semester &&
         (s.subjectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -220,15 +264,68 @@ export default function SubjectsPage() {
         <Header user={user} onLogout={handleLogout} />
         <main className="p-8">
           <div className="flex justify-between items-center mb-8">
-            <div className="w-46">
+            <div className="flex items-center gap-4">
               <Input
                 placeholder="Search subjects by name, code, or short name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="max-w-md"
               />
+              {/* Academic Year Filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Academic Year:</label>
+                <select
+                  value={selectedAcademicYear}
+                  onChange={(e) => setSelectedAcademicYear(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  {academicYears.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Branch Filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Branch:</label>
+                <select
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="All">All</option>
+                  {uniqueBranches.map(branch => (
+                    <option key={branch} value={branch}>{branch}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Even / Odd semester toggle */}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                {(['all', 'odd', 'even'] as const).map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setSemesterType(type)}
+                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors capitalize ${semesterType === type
+                      ? 'bg-white shadow text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                  >
+                    {type === 'all' ? 'All' : type === 'odd' ? 'Odd' : 'Even'}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = '/subjects_format.xlsx';
+                  link.download = 'subjects_format.xlsx';
+                  link.click();
+                }}
+              >
+                Download Format
+              </Button>
               <Button
                 variant="outline"
                 onClick={handleImportClick}
@@ -374,7 +471,7 @@ export default function SubjectsPage() {
           {getSubjectsWithoutSemester().length > 0 && (
             <div className="mb-16">
               <h1 className="text-3xl font-bold text-gray-900 mb-8">Other Subjects</h1>
-              
+
               {getSubjectsWithoutSemester().filter(s => !s.isLaboratory).length > 0 && (
                 <div className="mb-12">
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">Lectures</h2>
@@ -493,6 +590,7 @@ export default function SubjectsPage() {
             }}
             onAdd={editingSubject ? handleUpdateSubject : handleAddSubject}
             editingSubject={editingSubject}
+            academicYear={selectedAcademicYear}
           />
 
           <SubjectExcelPreviewModal

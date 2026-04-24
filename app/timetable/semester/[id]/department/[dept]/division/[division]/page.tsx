@@ -50,7 +50,7 @@ export default function DivisionTimetablePage() {
               </Button>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Timetable</h1>
               <p className="text-gray-600">
-                {department?.name} | Division: {semId}{department?.letter}{division}
+                {department?.name} | Division: {division}
               </p>
             </div>
 

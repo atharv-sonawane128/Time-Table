@@ -69,14 +69,7 @@ export const institutes = [
     id: '1',
     name: 'Parul Institute of Technology',
   },
-  {
-    id: '2',
-    name: 'Parul Institute of Science',
-  },
-  {
-    id: '3',
-    name: 'Parul Institute of Arts',
-  },
+
 ];
 
 export const faculties = [
@@ -104,7 +97,7 @@ export const faculties = [
 
 export const departments = [
   {
-    id: 'cs',
+    id: 'cse',
     name: 'Computer Science',
     code: 'CS',
     letter: 'A',

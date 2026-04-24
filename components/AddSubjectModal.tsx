@@ -14,6 +14,9 @@ interface Subject {
   isLaboratory: boolean;
   subjectId: string;
   assignedFaculties: string[];
+  academicYear?: string;
+  branch?: string;
+  semester?: number;
 }
 
 interface AddSubjectModalProps {
@@ -21,15 +24,18 @@ interface AddSubjectModalProps {
   onClose: () => void;
   onAdd: (subject: Omit<Subject, 'id'>) => Promise<void>;
   editingSubject?: Subject | null;
+  academicYear: string;
 }
 
-export default function AddSubjectModal({ isOpen, onClose, onAdd, editingSubject }: AddSubjectModalProps) {
+export default function AddSubjectModal({ isOpen, onClose, onAdd, editingSubject, academicYear }: AddSubjectModalProps) {
   const [formData, setFormData] = useState({
     subjectName: '',
     subjectCode: '',
     subjectShortName: '',
     isLaboratory: false,
-    subjectId: ''
+    subjectId: '',
+    branch: '',
+    semester: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -41,7 +47,9 @@ export default function AddSubjectModal({ isOpen, onClose, onAdd, editingSubject
         subjectCode: editingSubject.subjectCode,
         subjectShortName: editingSubject.subjectShortName,
         isLaboratory: editingSubject.isLaboratory,
-        subjectId: editingSubject.subjectId
+        subjectId: editingSubject.subjectId,
+        branch: editingSubject.branch || '',
+        semester: editingSubject.semester ? String(editingSubject.semester) : ''
       });
     } else {
       const newSubjectId = `SUB${Date.now()}`;
@@ -50,7 +58,9 @@ export default function AddSubjectModal({ isOpen, onClose, onAdd, editingSubject
         subjectCode: '',
         subjectShortName: '',
         isLaboratory: false,
-        subjectId: newSubjectId
+        subjectId: newSubjectId,
+        branch: '',
+        semester: ''
       });
     }
     setErrors({});
@@ -93,8 +103,11 @@ export default function AddSubjectModal({ isOpen, onClose, onAdd, editingSubject
 
       const subjectData: Omit<Subject, 'id'> = {
         ...formData,
+        semester: formData.semester ? Number(formData.semester) : undefined,
+        branch: formData.branch.trim() || undefined,
         subjectId: formData.subjectId,
-        assignedFaculties: []
+        assignedFaculties: [],
+        academicYear,
       };
 
       await onAdd(subjectData);
@@ -122,7 +135,10 @@ export default function AddSubjectModal({ isOpen, onClose, onAdd, editingSubject
         <div className="flex justify-between items-start p-6 border-b border-gray-200">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{editingSubject ? 'Edit Subject' : 'Add Subject'}</h2>
-            <p className="text-gray-600 mt-1">Create a new subject for timetable scheduling</p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-gray-600">Create a new subject for timetable scheduling</p>
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">{academicYear}</span>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -196,6 +212,31 @@ export default function AddSubjectModal({ isOpen, onClose, onAdd, editingSubject
                   value={formData.subjectId}
                   disabled
                   className="bg-gray-50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Branch
+                </label>
+                <Input
+                  value={formData.branch}
+                  onChange={(e) => setFormData(prev => ({ ...prev, branch: e.target.value }))}
+                  placeholder="Enter branch (e.g., Computer Science)"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Semester
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={formData.semester}
+                  onChange={(e) => setFormData(prev => ({ ...prev, semester: e.target.value }))}
+                  placeholder="Enter semester number"
                 />
               </div>
             </div>

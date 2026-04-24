@@ -65,17 +65,7 @@ const subjects = [
   'Structural Analysis'
 ];
 
-const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-const timeSlots = [
-  '9:00 AM - 10:00 AM',
-  '10:00 AM - 11:00 AM',
-  '11:00 AM - 12:00 PM',
-  '12:00 PM - 1:00 PM',
-  '2:00 PM - 3:00 PM',
-  '3:00 PM - 4:00 PM',
-  '4:00 PM - 5:00 PM'
-];
 
 export default function AddFacultyModal({ isOpen, onClose, onAdd, editingFaculty }: AddFacultyModalProps) {
   const [formData, setFormData] = useState({
@@ -154,7 +144,7 @@ export default function AddFacultyModal({ isOpen, onClose, onAdd, editingFaculty
     if (!String(formData.misId || '').trim()) newErrors.misId = 'MIS ID is required';
     if (!String(formData.shortName || '').trim()) newErrors.shortName = 'Faculty Short Name is required';
     if (!formData.department) newErrors.department = 'Department is required';
-    if (formData.availableDays.length === 0) newErrors.availableDays = 'At least one available day is required';
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -200,24 +190,7 @@ export default function AddFacultyModal({ isOpen, onClose, onAdd, editingFaculty
     if (errors.subjects) setErrors(prev => ({ ...prev, subjects: '' }));
   };
 
-  const handleDayChange = (day: string) => {
-    setFormData(prev => ({
-      ...prev,
-      availableDays: prev.availableDays.includes(day)
-        ? prev.availableDays.filter(d => d !== day)
-        : [...prev.availableDays, day]
-    }));
-    if (errors.availableDays) setErrors(prev => ({ ...prev, availableDays: '' }));
-  };
 
-  const handleTimeSlotChange = (slot: string) => {
-    setFormData(prev => ({
-      ...prev,
-      preferredTimeSlots: prev.preferredTimeSlots.includes(slot)
-        ? prev.preferredTimeSlots.filter(s => s !== slot)
-        : [...prev.preferredTimeSlots, slot]
-    }));
-  };
 
   if (!isOpen) return null;
 
@@ -385,63 +358,20 @@ export default function AddFacultyModal({ isOpen, onClose, onAdd, editingFaculty
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Max Lectures Per Week
+                  Max Workload (Hrs/Week)
                 </label>
                 <Input
                   type="number"
                   value={formData.maxLecturesPerWeek}
                   onChange={(e) => setFormData(prev => ({ ...prev, maxLecturesPerWeek: parseInt(e.target.value) || 0 }))}
                   min="1"
-                  max="50"
+                  max="100"
                 />
               </div>
             </div>
           </div>
 
-          {/* Availability Settings */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Availability Settings</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Available Days <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {daysOfWeek.map(day => (
-                    <label key={day} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.availableDays.includes(day)}
-                        onChange={() => handleDayChange(day)}
-                        className="rounded"
-                      />
-                      <span className="text-sm">{day}</span>
-                    </label>
-                  ))}
-                </div>
-                {errors.availableDays && <p className="text-red-500 text-sm mt-1">{errors.availableDays}</p>}
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Preferred Time Slots
-                </label>
-                <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-md p-2">
-                  {timeSlots.map(slot => (
-                    <label key={slot} className="flex items-center space-x-2 mb-1">
-                      <input
-                        type="checkbox"
-                        checked={formData.preferredTimeSlots.includes(slot)}
-                        onChange={() => handleTimeSlotChange(slot)}
-                        className="rounded"
-                      />
-                      <span className="text-sm">{slot}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Status & Role */}
           <div>

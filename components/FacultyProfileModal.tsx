@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Button } from './ui/button';
 
 interface Faculty {
@@ -28,15 +30,32 @@ interface FacultyProfileModalProps {
 }
 
 export default function FacultyProfileModal({ isOpen, onClose, faculty }: FacultyProfileModalProps) {
+  const [workload, setWorkload] = useState<number>(0);
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    if (isOpen) {
+    if (isOpen && faculty) {
       document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
+      
+      const unsubscribeTimetables = onSnapshot(collection(db, 'timetables'), (querySnapshot) => {
+        let count = 0;
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.assignments && Array.isArray(data.assignments)) {
+            count += data.assignments.filter((a: any) => a.faculty && a.faculty.facultyId === faculty.facultyId).length;
+          }
+        });
+        setWorkload(count);
+      });
+
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+        unsubscribeTimetables();
+      };
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, faculty]);
 
   if (!isOpen || !faculty) return null;
 
@@ -123,8 +142,12 @@ export default function FacultyProfileModal({ isOpen, onClose, faculty }: Facult
                 <p className="text-gray-900">{faculty.role}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Max Lectures Per Week</label>
+                <label className="block text-sm font-medium text-gray-700">Max Workload (Hrs/Week)</label>
                 <p className="text-gray-900">{faculty.maxLecturesPerWeek}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Current Workload</label>
+                <p className="text-blue-600 font-medium">{workload}/{faculty.maxLecturesPerWeek} hrs/week</p>
               </div>
             </div>
           </div>
@@ -148,46 +171,8 @@ export default function FacultyProfileModal({ isOpen, onClose, faculty }: Facult
             </div>
           </div>
 
-          {/* Availability */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Availability</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Available Days</label>
-                <div className="flex flex-wrap gap-2">
-                  {faculty.availableDays && faculty.availableDays.length > 0 ? (
-                    faculty.availableDays.map((day, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full"
-                      >
-                        {day}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-gray-500">No days specified</p>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Time Slots</label>
-                <div className="flex flex-wrap gap-2">
-                  {faculty.preferredTimeSlots && faculty.preferredTimeSlots.length > 0 ? (
-                    faculty.preferredTimeSlots.map((slot, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded-full"
-                      >
-                        {slot}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-gray-500">No time slots specified</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+
+
         </div>
 
         {/* Footer */}

@@ -119,19 +119,22 @@ export default function SubjectDetailsPage() {
     router.push('/');
   };
 
-  const handleAssignFaculty = async (facultyId: string) => {
-    if (!subject) return;
+  const handleAssignFaculty = async (facultyIds: string[]) => {
+    if (!subject || facultyIds.length === 0) return;
 
     try {
-      // Add faculty to subject's assignedFaculties
+      // Add all faculties to subject's assignedFaculties
       await updateDoc(doc(db, 'subjects', subject.id), {
-        assignedFaculties: arrayUnion(facultyId)
+        assignedFaculties: arrayUnion(...facultyIds)
       });
 
-      // Add subject to faculty's subjects (using subject name)
-      await updateDoc(doc(db, 'faculty', facultyId), {
-        subjects: arrayUnion(subject.subjectName)
-      });
+      // Add subject to each faculty's subjects list
+      const facultyUpdates = facultyIds.map(facultyId => 
+        updateDoc(doc(db, 'faculty', facultyId), {
+          subjects: arrayUnion(subject.subjectName)
+        })
+      );
+      await Promise.all(facultyUpdates);
     } catch (error) {
       console.error('Error assigning faculty:', error);
       alert('Error assigning faculty. Please try again.');

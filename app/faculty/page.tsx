@@ -43,6 +43,7 @@ export default function FacultyPage() {
   const [previewFacultyData, setPreviewFacultyData] = useState<{faculty: Omit<Faculty, 'id'>, isDuplicate: boolean}[]>([]);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
+  const [allAssignments, setAllAssignments] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -54,7 +55,23 @@ export default function FacultyPage() {
         router.push('/');
       }
     });
-    return () => unsubscribe();
+
+    // Fetch assignments to calculate workload
+    const unsubscribeTimetables = onSnapshot(collection(db, 'timetables'), (querySnapshot) => {
+      const assignments: any[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.assignments && Array.isArray(data.assignments)) {
+          assignments.push(...data.assignments);
+        }
+      });
+      setAllAssignments(assignments);
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeTimetables();
+    };
   }, [router]);
 
   useEffect(() => {
@@ -235,6 +252,17 @@ export default function FacultyPage() {
             <div className="flex space-x-3">
               <Button
                 variant="outline"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = '/faculty_format.xlsx';
+                  link.download = 'faculty_format.xlsx';
+                  link.click();
+                }}
+              >
+                Download Format
+              </Button>
+              <Button
+                variant="outline"
                 onClick={handleImportClick}
                 disabled={isImporting}
               >
@@ -258,7 +286,9 @@ export default function FacultyPage() {
               .filter((faculty) =>
                 faculty.name.toLowerCase().includes(searchQuery.toLowerCase())
               )
-              .map((faculty) => (
+              .map((faculty) => {
+                const workload = allAssignments.filter(a => a.faculty && a.faculty.facultyId === faculty.facultyId).length;
+                return (
               <div key={faculty.id} className="bg-white p-6 rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleViewProfile(faculty)}>
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -270,6 +300,7 @@ export default function FacultyPage() {
                       <p className="text-gray-600 truncate" title={faculty.email}>{faculty.email}</p>
                       <p className="text-gray-500 text-sm">MIS ID: {faculty.misId}</p>
                       <p className="text-gray-500 text-sm truncate" title={`${faculty.department} - ${faculty.designation}`}>{faculty.department} - {faculty.designation}</p>
+                      <p className="text-blue-600 font-medium text-sm mt-1">Workload: {workload}/{faculty.maxLecturesPerWeek} hrs/week</p>
                     </div>
                   </div>
                   <span className={`px-2 py-1 text-xs rounded-full flex-shrink-0 ml-2 ${faculty.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -299,7 +330,7 @@ export default function FacultyPage() {
                   </Button>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
 
           <AddFacultyModal
