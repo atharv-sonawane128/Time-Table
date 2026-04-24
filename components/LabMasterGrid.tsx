@@ -140,8 +140,9 @@ const LabMasterGrid: React.FC = () => {
       return;
     }
 
+    const sortedLabs = [...labs].sort((a, b) => a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true, sensitivity: 'base' }));
     const columns = days.flatMap(day => doubleSlots.map(slot => ({ day, slot })));
-    const exportRows = labs.map((lab) => {
+    const exportRows = sortedLabs.map((lab) => {
       const row: Record<string, string> = {
         Lab: lab.roomNumber,
       };
@@ -213,7 +214,7 @@ const LabMasterGrid: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white">
-              {labs.map((lab: Lab) => (
+              {[...labs].sort((a, b) => a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true, sensitivity: 'base' })).map((lab: Lab) => (
                 <tr key={lab.id} className="border-b border-gray-200 last:border-b-0">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 bg-gray-50 border-r border-gray-200 min-w-[120px] sticky left-0 z-10 shadow-[2px_0_0_0_rgba(229,231,235,1)]">
                     {lab.roomNumber}

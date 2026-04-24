@@ -131,11 +131,7 @@ export default function LectureMasterPage() {
       return;
     }
 
-    const sortedRooms = [...rooms].sort((a, b) => {
-      const numA = parseInt(a.roomNumber.replace(/\D/g, '')) || 0;
-      const numB = parseInt(b.roomNumber.replace(/\D/g, '')) || 0;
-      return numA - numB;
-    });
+    const sortedRooms = [...rooms].sort((a, b) => a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true, sensitivity: 'base' }));
 
     const columns = days.flatMap(day => timeSlots.map(slot => ({ day, slot })));
     const exportRows = sortedRooms.map((room) => {
@@ -212,11 +208,7 @@ export default function LectureMasterPage() {
                 </thead>
                 <tbody className="bg-white">
                   {rooms
-                    .sort((a, b) => {
-                      const numA = parseInt(a.roomNumber.replace(/\D/g, '')) || 0;
-                      const numB = parseInt(b.roomNumber.replace(/\D/g, '')) || 0;
-                      return numA - numB;
-                    })
+                    .sort((a, b) => a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true, sensitivity: 'base' }))
                     .map((room) => (
                     <tr key={room.id} className="border-b border-gray-200 last:border-b-0">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900 bg-gray-50 border-r border-gray-200 min-w-[200px] sticky left-0 z-10 shadow-[2px_0_0_0_rgba(229,231,235,1)]">
