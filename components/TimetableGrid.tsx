@@ -564,7 +564,7 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ semesterId, departmentId,
       const cell = signatureRow.getCell(c);
       applyBorder(cell);
       cell.font = { bold: true };
-      cell.alignment = { horizontal: 'center', vertical: 'center', wrapText: true };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
